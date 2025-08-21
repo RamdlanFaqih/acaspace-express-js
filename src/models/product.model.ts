@@ -10,24 +10,50 @@ export interface Product {
     savings: number
 }
 
+export interface ProductList{
+    rows: Product[]
+    total: number
+}
+
 export const ProductModel = {
     // PROMISE
     // GET ALL PRODUCTS / READ
-    getAll: (search?: string): Promise<Product[]> => {
+    getAll: (page: number, pageSize: number, search?: string): Promise<ProductList> => {
         return new Promise((resolve, reject) => {
+            const offset = (page - 1) * pageSize;
+
             let query = 'SELECT * FROM products';
+            let countQuery = 'SELECT COUNT(*) FROM products';
             const values = [];
             if (search) {
                 query += " WHERE name ILIKE $1";
+                countQuery += " WHERE name ILIKE $1";
                 values.push(`%${search}%`)
+                // values = [`%${search}%`]
+                // length 1
             }
-            console.log("query", query)
-            console.log("values", values)
+
+             // values = []
+            //  length = 0
+            query += ` ORDER BY id ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+            // kalo ada search
+            // query += ` ORDER BY id ASC LIMIT $2 OFFSET $3`,
+            // kalo tidak ada search
+            // query += ` ORDER BY id ASC LIMIT $1 OFFSET $2`,
+            values.push(pageSize, offset)
+
             db.query(query, values, (err, result) => {
+                console.log
                 if (err) {
                     reject(err)
                 }
-                resolve(result.rows)
+                db.query(countQuery, search ? [`%${search}%`] : [], (countErr, countResult) => {
+                    if(countErr) {
+                        return reject(countErr)
+                    }
+                    const total = parseInt(countResult.rows[0].count)
+                    resolve({rows: result.rows, total})
+                })
             })
         })
     },
